@@ -51,7 +51,7 @@ app.MapGet("/{shortUrl}", async (string shortUrl) =>
 });
 
 // Crear registro para una url corta
-app.MapPost("/", async (UrlRedirect urlRedirect) =>
+app.MapPost("/create", async (UrlRedirect urlRedirect) =>
 {
     // usando la base de datos de SQLite para obtener la url larga
     using var db = new ShortIoContext(new DbContextOptionsBuilder<ShortIoContext>().UseSqlite($"Data Source={dbPath}").Options);
