@@ -1,3 +1,3 @@
 # Table of contents
 
-* [Short.io](README.md)
+* [🩳 Short.io](README.md)
