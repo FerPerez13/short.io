@@ -24,13 +24,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
@@ -53,28 +48,63 @@ app.MapGet("/{shortUrl}", async (string shortUrl) =>
 });
 
 // Crear registro para una url corta
-app.MapPost("/create", async (UrlRedirect urlRedirect) =>
+app.MapPost("/create", async (string longUrl) =>
 {
     var tableServiceClient = new TableServiceClient(storageConfiguration.ConnectionString);
     var tableClient = tableServiceClient.GetTableClient(storageConfiguration.AzureTable.UrlTableName);
     tableClient.CreateIfNotExists();
     
-    var urlRedirectExists = tableClient.Query<UrlRedirect>().FirstOrDefault(u => u.LongUrl == urlRedirect.LongUrl);
+    var urlRedirectExists = tableClient.Query<UrlRedirect>().FirstOrDefault(u => u.LongUrl == longUrl);
     if (urlRedirectExists != null)
     {
         return new OkObjectResult(urlRedirectExists);
     }
 
-    urlRedirect.PartitionKey = Guid.NewGuid().ToString();
-    urlRedirect.RowKey = storageConfiguration.AzureTable.RowKey;
-    urlRedirect.ShortUrl = Guid.NewGuid().ToString().Substring(0, 5);
-    urlRedirect.CreatedAt = DateTime.UtcNow;
-    urlRedirect.UpdatedAt = DateTime.UtcNow;
+    var urlRedirect = new UrlRedirect
+    {
+        PartitionKey = Guid.NewGuid().ToString(),
+        RowKey = storageConfiguration.AzureTable.RowKey,
+        ShortUrl = Guid.NewGuid().ToString().Substring(0, 5),
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow,
+        LongUrl = longUrl,
+    };
     
     tableClient.AddEntity(urlRedirect);
     
-    return new OkObjectResult(urlRedirect);
+    return new OkObjectResult(urlRedirect.ShortUrl);
 });
+
+// Listar todos los registros de la tabla
+app.MapGet("/list", async () =>
+{
+    var tableServiceClient = new TableServiceClient(storageConfiguration.ConnectionString);
+    var tableClient = tableServiceClient.GetTableClient(storageConfiguration.AzureTable.UrlTableName);
+    tableClient.CreateIfNotExists();
+    
+    var urlRedirects = tableClient.Query<UrlRedirect>().ToList();
+    
+    return new OkObjectResult(urlRedirects);
+});
+
+// Eliminar un registro de la tabla por su shortUrl
+app.MapDelete("/delete/{shortUrl}", async (string shortUrl) =>
+{
+    var tableServiceClient = new TableServiceClient(storageConfiguration.ConnectionString);
+    var tableClient = tableServiceClient.GetTableClient(storageConfiguration.AzureTable.UrlTableName);
+    tableClient.CreateIfNotExists();
+    
+    var urlRedirect = tableClient.Query<UrlRedirect>().FirstOrDefault(u => u.ShortUrl == shortUrl);
+    if (urlRedirect == null)
+    {
+        return Results.NotFound();
+    }
+    
+    tableClient.DeleteEntity(urlRedirect.PartitionKey, urlRedirect.RowKey);
+    
+    return Results.Ok();
+});
+
 // #endregion
 
 app.Run();
